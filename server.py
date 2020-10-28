@@ -1,4 +1,3 @@
-import sys
 import socket
 import asyncio
 
@@ -28,11 +27,9 @@ class Server:
 
     async def send_message_to_everyone(self, client_socket: socket.socket, message: bytes) -> None:
         """Sends message from one client to others"""
-        while True:
-            for client in self.all_clients:
-                if client is not client_socket:
-                    await self.event_loop.sock_sendall(client, message)
-            break
+        for client in self.all_clients:
+            if client is not client_socket:
+                await self.event_loop.sock_sendall(client, message)
 
     async def get_client_message(self, client_socket: socket.socket) -> None:
         """Gets client's message"""
@@ -49,11 +46,9 @@ class Server:
 
     async def send_message_by_id(self, message: bytes, client_id: int) -> None:
         """Sends message from one client to another one, by the name of the second"""
-        while True:
-            for client_i in range(len(self.all_clients)):
-                if client_i == client_id:
-                    await self.event_loop.sock_sendall(self.all_clients[client_i], message)
-            break
+        for client_i in range(len(self.all_clients)):
+            if client_i == client_id:
+                await self.event_loop.sock_sendall(self.all_clients[client_i], message)
 
     async def start(self) -> None:
         """Starts the server"""
