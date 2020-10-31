@@ -13,4 +13,3 @@ create table users_rooms(
     room_id int references rooms(id),
     user_id int references users(id)
 );
-
