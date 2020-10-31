@@ -17,7 +17,11 @@ class Server:
         self.server.listen()
 
         self.event_loop = asyncio.get_event_loop()
-        self.event_loop.run_until_complete(self.start())
+        try:
+            self.event_loop.run_until_complete(self.start())
+        except KeyboardInterrupt:
+            print('Exit')
+            exit(0)
 
     async def accept_client(self) -> None:
         """Connects clients to the server"""
