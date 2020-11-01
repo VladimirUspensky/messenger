@@ -1,15 +1,24 @@
-create table users(
+create table clients(
     id serial primary key,
     name varchar(255),
-    address varchar(255)
+    addr varchar(50)
 );
 
 create table rooms(
     id serial primary key,
-    name varchar(255)
+    name varchar(255),
+    author_id int references clients(id)
 );
 
-create table users_rooms(
+create table clients_rooms(
+    client_id int references clients(id),
+    room_id int references rooms(id)
+);
+
+create table messages(
+    id serial primary key,
     room_id int references rooms(id),
-    user_id int references users(id)
+    from_id int references clients(id),
+    to_id int references clients(id),
+    content varchar(255)
 );

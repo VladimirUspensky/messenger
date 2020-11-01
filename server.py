@@ -9,6 +9,7 @@ class Server:
         self.ip = str(ip)
         self.port = int(port)
         self.all_clients = []
+        self.chat_history = []
         self.rooms = defaultdict(set)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -61,19 +62,28 @@ class Server:
         """Adds the given client to the room"""
         self.rooms[str(room_id)].add(client_socket)
 
+    async def get_chat_history_in_room(self, room_id: str):
+        """Returns chat history of all clients from the given room"""
+
+    async def get_private_chat_history(self, first_client: socket.socket, second_client: socket.socket):
+        """Returns chat history of 2 given clients"""
+
+    async def get_main_chat_history(self):
+        """Returns all history from the main chat"""
+
     async def parse_client_message(self, message: bytes, client_socket: socket.socket) -> None:
         """Parses client's input: some flags, commands, etc"""
         message = message.decode('utf-8')
         split_message = message.split(' ')
 
-        if split_message[0] == 'create_room':
+        if split_message[0] == '/create_room':
             await self.create_room(split_message[1], client_socket)
-        elif split_message[0] == 'join':
+        elif split_message[0] == '/join':
             await self.add_to_room(split_message[1], client_socket)
-        elif split_message[len(split_message) - 2] == '-to':
+        elif split_message[len(split_message) - 2] == '/to':
             await self.send_message_by_id((split_message[0] + '\n\r').encode('utf-8'),
                                           int(split_message[len(split_message) - 1]))
-        elif split_message[len(split_message) - 2] == '-room':
+        elif split_message[len(split_message) - 2] == '/room':
             await self.send_message_in_room((split_message[0] + '\n\r'),
                                             split_message[len(split_message) - 1])
         else:
