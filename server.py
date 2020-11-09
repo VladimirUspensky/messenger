@@ -70,7 +70,7 @@ class Server:
     @staticmethod
     async def get_chat_history_in_room(room_id: int):
         """Returns chat history of all clients from the given room"""
-        history = fetchall('messages', ['room_id', 'from_id', 'to_id', 'content'])
+        history = fetchall('messages', ['room_id', 'from_id', 'to_id', 'date_time', 'content'])
         result_history = []
         for message in history:
             if message[0] == room_id:
@@ -83,7 +83,7 @@ class Server:
         history = dict()
         clients = fetchall('clients', ['id', 'name'])
         for tup in chat_history:
-            history[tup[1]] = tup[3]
+            history[tup[1]] = str(tup[3]) + ': ' + str(tup[4])
         for tup in clients:
             try:
                 history[tup[1]] = history.pop(tup[0])
@@ -96,7 +96,6 @@ class Server:
         """Writes history in the console"""
         for message in chat_history:
             print(f'{message} -> {chat_history[message]}')
-
 
     async def get_private_chat_history(self, first_client: socket.socket, second_client: socket.socket):
         """Returns chat history of 2 given clients"""
