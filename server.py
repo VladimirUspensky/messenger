@@ -1,5 +1,6 @@
 import socket
 import asyncio
+from db import *
 from collections import defaultdict
 
 
@@ -27,6 +28,10 @@ class Server:
     async def accept_client(self) -> None:
         """Connects clients to the server"""
         while True:
+            history = await self.get_chat_history_in_room(1)
+            #print(history)
+            history = await self.parse_chat_history(history)
+            self.print_chat_history(history)
             client_socket, _ = await self.event_loop.sock_accept(self.server)
             if client_socket not in self.all_clients:
                 self.all_clients.append(client_socket)
@@ -62,8 +67,36 @@ class Server:
         """Adds the given client to the room"""
         self.rooms[str(room_id)].add(client_socket)
 
-    async def get_chat_history_in_room(self, room_id: str):
+    @staticmethod
+    async def get_chat_history_in_room(room_id: int):
         """Returns chat history of all clients from the given room"""
+        history = fetchall('messages', ['room_id', 'from_id', 'to_id', 'content'])
+        result_history = []
+        for message in history:
+            if message[0] == room_id:
+                result_history.append(message)
+        return result_history
+
+    @staticmethod
+    async def parse_chat_history(chat_history: List[tuple]) -> Dict[str, str]:
+        """Returns dictionary NAME:MESSAGE with all room's history"""
+        history = dict()
+        clients = fetchall('clients', ['id', 'name'])
+        for tup in chat_history:
+            history[tup[1]] = tup[3]
+        for tup in clients:
+            try:
+                history[tup[1]] = history.pop(tup[0])
+            except KeyError:
+                pass
+        return history
+
+    @staticmethod
+    def print_chat_history(chat_history: Dict[str, str]) -> None:
+        """Writes history in the console"""
+        for message in chat_history:
+            print(f'{message} -> {chat_history[message]}')
+
 
     async def get_private_chat_history(self, first_client: socket.socket, second_client: socket.socket):
         """Returns chat history of 2 given clients"""

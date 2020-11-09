@@ -3,8 +3,8 @@ import psycopg2
 from typing import Dict, List, Tuple
 
 
-conn = psycopg2.connect(dbname='messengerdb', user=os.getenv('USERDB'),
-                        password='PASSWORDDB', host='localhost')
+conn = psycopg2.connect(dbname='messengerdb',  password=os.getenv('PASSWORDDATABASE'),
+                        user=os.getenv('USERDATABASE'), host='localhost')
 cursor = conn.cursor()
 
 
@@ -40,5 +40,5 @@ def delete(table: str, raw_id: int) -> None:
     conn.commit()
 
 
-insert('clients', {'name': 'Jack', 'addr': 'xzxcxcx'})
-print(fetchall('clients', ['id', 'name', 'addr']))
+#insert('clients', {'name': 'Jack', 'addr': 'xzxcxcx'})
+#print(fetchall('clients', ['id', 'name', 'addr']))
