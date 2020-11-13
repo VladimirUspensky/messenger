@@ -11,8 +11,9 @@ create table rooms(
 );
 
 create table clients_rooms(
-    client_id int references clients(id),
-    room_id int references rooms(id)
+    client_id int references clients(id) on update cascade,
+    room_id int references rooms(id) on update cascade,
+    constraint clients_rooms_pkey primary key (client_id, room_id)
 );
 
 create table messages(

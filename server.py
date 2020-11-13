@@ -28,10 +28,6 @@ class Server:
     async def accept_client(self) -> None:
         """Connects clients to the server"""
         while True:
-            history = await self.get_chat_history_in_room(1)
-            #print(history)
-            history = await self.parse_chat_history(history)
-            self.print_chat_history(history)
             client_socket, _ = await self.event_loop.sock_accept(self.server)
             if client_socket not in self.all_clients:
                 self.all_clients.append(client_socket)
@@ -67,14 +63,15 @@ class Server:
         """Adds the given client to the room"""
         self.rooms[str(room_id)].add(client_socket)
 
-    @staticmethod
-    async def get_chat_history_in_room(room_id: int):
+    async def get_chat_history_in_room(self, client_socket: socket.socket, room_id: int) -> List[tuple]:
         """Returns chat history of all clients from the given room"""
         history = fetchall('messages', ['room_id', 'from_id', 'to_id', 'date_time', 'content'])
         result_history = []
         for message in history:
             if message[0] == room_id:
                 result_history.append(message)
+        history = await self.parse_chat_history(result_history)
+        await self.print_chat_history(client_socket, history)
         return result_history
 
     @staticmethod
@@ -82,20 +79,20 @@ class Server:
         """Returns dictionary NAME:MESSAGE with all room's history"""
         history = dict()
         clients = fetchall('clients', ['id', 'name'])
-        for tup in chat_history:
-            history[tup[1]] = str(tup[3]) + ': ' + str(tup[4])
-        for tup in clients:
+        for _, from_id, _, date_time, content in chat_history:
+            history[from_id] = str(date_time) + ': ' + str(content)
+        for client_id, client_name in clients:
             try:
-                history[tup[1]] = history.pop(tup[0])
+                history[client_name] = history.pop(client_id)
             except KeyError:
                 pass
         return history
 
-    @staticmethod
-    def print_chat_history(chat_history: Dict[str, str]) -> None:
+    async def print_chat_history(self, client_socket: socket.socket, chat_history: Dict[str, str]) -> None:
         """Writes history in the console"""
-        for message in chat_history:
-            print(f'{message} -> {chat_history[message]}')
+        for name in chat_history:
+            await self.event_loop.sock_sendall(client_socket,
+                                               str(name + '->' + chat_history[name] + '\n').encode('utf-8'))
 
     async def get_private_chat_history(self, first_client: socket.socket, second_client: socket.socket):
         """Returns chat history of 2 given clients"""
@@ -118,6 +115,8 @@ class Server:
         elif split_message[len(split_message) - 2] == '/room':
             await self.send_message_in_room((split_message[0] + '\n\r'),
                                             split_message[len(split_message) - 1])
+        elif split_message[0] == '/get_history':
+            await self.get_chat_history_in_room(client_socket, int(split_message[1]))
         else:
             await self.send_message_to_everyone(client_socket, message.encode('utf-8'))
 
