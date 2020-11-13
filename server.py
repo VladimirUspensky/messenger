@@ -1,3 +1,4 @@
+import re
 import socket
 import asyncio
 from db import *
@@ -28,10 +29,28 @@ class Server:
     async def accept_client(self) -> None:
         """Connects clients to the server"""
         while True:
-            client_socket, _ = await self.event_loop.sock_accept(self.server)
+            client_socket, client_addr = await self.event_loop.sock_accept(self.server)
             if client_socket not in self.all_clients:
+                await self.register_new_client(client_socket, client_addr)
                 self.all_clients.append(client_socket)
             self.event_loop.create_task(self.get_client_message(client_socket))
+
+    async def register_new_client(self, client_socket: socket.socket, client_addr: tuple):
+        """Gets name and addr from client and add the client to db"""
+        await self.event_loop.sock_sendall(client_socket, 'Your name: '.encode('utf-8'))
+        while True:
+            name = await self.event_loop.sock_recv(client_socket, 1024)
+            name = name.decode('utf-8')
+            clean_name = re.sub('\W+', '', name)
+            names = fetchall('clients', ['name'])
+            if clean_name in names:
+                await self.event_loop.sock_sendall(client_socket, 'Enter another name'.encode('utf-8'))
+                continue
+            ip, port = client_addr
+            addr = str(ip) + ':' + str(port)
+            insert('clients', {'name': clean_name, 'addr': addr})
+            await self.event_loop.sock_sendall(client_socket, 'Successfully registered'.encode('utf-8'))
+            break
 
     async def send_message_to_everyone(self, client_socket: socket.socket, message: bytes) -> None:
         """Sends message from one client to others"""
@@ -49,19 +68,20 @@ class Server:
 
     async def send_message_by_id(self, message: bytes, client_id: int) -> None:
         """Sends message from one client to another one, by the name of the second"""
-        for client_i in range(len(self.all_clients)):
-            if client_i == client_id:
-                await self.event_loop.sock_sendall(self.all_clients[client_i], message)
+        await self.event_loop.sock_sendall(self.all_clients[client_id], message)
 
-    async def send_message_in_room(self, message: str, room_id: str) -> None:
+    async def send_message_in_room(self, message: str, room_id: str, client_socket: socket.socket) -> None:
         """Sends message from one client to others in the chosen room"""
         recipients = self.rooms.get(str(room_id))
         for recipient in recipients:
-            await self.event_loop.sock_sendall(recipient, message.encode('utf-8'))
+            if recipient is not client_socket:
+                await self.event_loop.sock_sendall(recipient, message.encode('utf-8'))
 
     async def add_to_room(self, room_id: str, client_socket: socket.socket) -> None:
         """Adds the given client to the room"""
         self.rooms[str(room_id)].add(client_socket)
+        client_id = self.all_clients.index(client_socket)
+        insert('clients_rooms', {'client_id': client_id, 'room_id': room_id})
 
     async def get_chat_history_in_room(self, client_socket: socket.socket, room_id: int) -> List[tuple]:
         """Returns chat history of all clients from the given room"""
@@ -71,7 +91,7 @@ class Server:
             if message[0] == room_id:
                 result_history.append(message)
         history = await self.parse_chat_history(result_history)
-        await self.print_chat_history(client_socket, history)
+        await self.send_chat_history(client_socket, history)
         return result_history
 
     @staticmethod
@@ -88,7 +108,7 @@ class Server:
                 pass
         return history
 
-    async def print_chat_history(self, client_socket: socket.socket, chat_history: Dict[str, str]) -> None:
+    async def send_chat_history(self, client_socket: socket.socket, chat_history: Dict[str, str]) -> None:
         """Writes history in the console"""
         for name in chat_history:
             await self.event_loop.sock_sendall(client_socket,
@@ -106,7 +126,7 @@ class Server:
         split_message = message.split(' ')
 
         if split_message[0] == '/create_room':
-            await self.create_room(split_message[1], client_socket)
+            await self.create_room(split_message[1], split_message[2], client_socket)
         elif split_message[0] == '/join':
             await self.add_to_room(split_message[1], client_socket)
         elif split_message[len(split_message) - 2] == '/to':
@@ -114,15 +134,18 @@ class Server:
                                           int(split_message[len(split_message) - 1]))
         elif split_message[len(split_message) - 2] == '/room':
             await self.send_message_in_room((split_message[0] + '\n\r'),
-                                            split_message[len(split_message) - 1])
+                                            split_message[len(split_message) - 1],
+                                            client_socket)
         elif split_message[0] == '/get_history':
             await self.get_chat_history_in_room(client_socket, int(split_message[1]))
         else:
             await self.send_message_to_everyone(client_socket, message.encode('utf-8'))
 
-    async def create_room(self, room_id: str, client_socket: socket.socket) -> None:
+    async def create_room(self, room_id: str, room_name: str, client_socket: socket.socket) -> None:
         """Creates the room by client's request"""
         self.rooms[room_id].add(client_socket)
+        author_id = self.all_clients.index(client_socket)
+        insert('rooms', {'name': room_name, 'author_id': str(author_id)})
 
     async def start(self) -> None:
         """Starts the server"""
